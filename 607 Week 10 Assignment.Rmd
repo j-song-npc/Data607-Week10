@@ -1,0 +1,94 @@
+---
+title: "Data 607 Week 10 Assignment"
+author: "Jane Song"
+date: "2025-04-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## Introduction
+
+For this assignment, I continued to work with the New York Times API, similar to last week. I think it would be interesting to explore whether there is any bias in the overall sentiment of recent top articles from the NY Times' US section. This seems particularly relevant given the ongoing discussions about bias in news sources. My goal is to investigate whether the NY Times actually exhibits a negative sentiment toward recent news in the US.
+
+
+## Load sentiment datasets
+
+```{r}
+library(tidytext)
+library(textdata)
+library(gutenbergr)
+get_sentiments("afinn")
+get_sentiments("bing")
+get_sentiments("nrc")
+```
+
+## Load in other necessary packages
+```{r}
+library(dplyr)
+library(stringr)
+library(httr)
+library(jsonlite)
+```
+
+##Load in NY times articles 
+```{r}
+nyt_data <- fromJSON("https://api.nytimes.com/svc/mostpopular/v2/viewed/7.json?api-key=Kvwbcb6A0F0rOKRfIMVlCWUPGNVbpSVn")
+
+nyt_df <- as.data.frame(nyt_data)
+  
+```
+
+## Extract necessary variables 
+```{r}
+articles <- nyt_df %>%
+   filter(results.section == "U.S.") %>%
+  select(results.title, results.abstract) %>%
+```
+
+## Filter by sentiment using nrc 
+```{r}
+articles_sentiment <- articles %>%
+  unite("text", results.abstract, results.title, sep = "") %>%
+  unnest_tokens(word, text) %>%
+  inner_join(get_sentiments("nrc")) %>%
+  count(sentiment, sort=TRUE)
+
+print(articles_sentiment)
+```
+
+## Data visualization  
+```{r}
+articles_sentiment %>%
+  ggplot(aes(x = reorder(sentiment, n), y = n, fill = sentiment)) +
+  geom_col(show.legend = FALSE) +
+  coord_flip() +  
+  labs(title = "Sentiment in Most Popular NYT Articles in Last 7 Days",
+       x = "Emotion",
+       y = "Frequency") 
+```
+
+## Word cloud analysis 
+```{r}
+library(wordcloud)
+library(reshape2)
+
+articles %>%
+  unnest_tokens(word, results.abstract) %>%
+  inner_join(get_sentiments("bing"), by = "word") %>%
+  count(word, sentiment, sort = TRUE) %>%
+  acast(word ~ sentiment, value.var = "n", fill = 0) %>%
+  comparison.cloud()
+  
+
+```
+
+## Conclusion
+
+From this analysis, we can see that the sentiment was more positive from the top US articles in the last 7 days, although not too different in number. However, after looking at the results in the word cloud, I noticed "trump" was placed in the positive bucket when it's a name. I suspect this is because bing is seeing trump as the actual word, not as a name. I think this may have skewed my outcomes a bit and next time I may have to try using a different sentiment lexicon or filter this out. A little search is telling me that Named Entity Recognition may also be helpful if I try this again. 
+
+
+
+
